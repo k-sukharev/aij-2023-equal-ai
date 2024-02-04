@@ -1,0 +1,95 @@
+seed_everything:
+  _target_: lightning.seed_everything
+  seed: &seed 42
+  workers: True
+datamodule:
+  _target_: aij_2023_equal_ai.datasets.KineticsDataModule
+  data_path: ../input/slovo_event_offset_48_anno
+  video_path_prefix: ../input/slovo_event_offset_48
+  train_transforms:
+    _target_: aij_2023_equal_ai.transforms.create_video_transform
+    mode: train
+    video_key: video
+    remove_key: null
+    num_samples: 16
+    convert_to_float: False
+    video_mean: [123.675, 116.28, 103.53]
+    video_std: [58.395, 57.12, 57.375]
+    min_size: 192
+    max_size: 256
+    crop_size: 224
+    horizontal_flip_prob: 0.5
+    aug_type: randaug  # default randaug augmix
+    aug_paras: null
+  val_transforms:
+    _target_: aij_2023_equal_ai.transforms.create_video_transform
+    mode: val
+    video_key: video
+    remove_key: null
+    num_samples: 16
+    convert_to_float: False
+    video_mean: [123.675, 116.28, 103.53]
+    video_std: [58.395, 57.12, 57.375]
+    min_size: 224
+    max_size: 224
+    crop_size: 224
+    horizontal_flip_prob: 0.5
+    aug_type: randaug
+    aug_paras: null
+  clip_duration: 2.14  # 2.14~64 frames at 30 fps (30 * 2.14)
+  seed: *seed
+  batch_size: 6
+  num_workers: 8
+  pin_memory: False
+model:
+  _target_: aij_2023_equal_ai.models.VideoClassificationLightningModule.load_from_checkpoint
+  checkpoint_path: &ckpt lightning_logs/version_78/checkpoints/last.ckpt # 74, 76, 77, 78, 84
+  _recursive_: False
+  _convert_: partial
+  net:
+    _target_: aij_2023_equal_ai.models.MMActionWrapper
+    config: ../input/baseline/mvit32.2_small_custom_config.py
+    checkpoint: ../input/baseline/mvit32.2_small.pth
+  criterion:
+    _target_: torch.nn.CrossEntropyLoss
+    reduction: mean
+    label_smoothing: 0.1
+  num_classes: 1001
+  batch_key: video
+  optimizer:
+    _target_: torch.optim.AdamW
+    _convert_: partial
+    lr: 5.e-5  # 1.e-4 3.e-4
+    weight_decay: 5.e-2  # 5.e-2 1.e-2
+  scheduler_dict:
+    interval: step
+  scheduler:
+    _target_: pl_bolts.optimizers.lr_scheduler.LinearWarmupCosineAnnealingLR
+    warmup_epochs: 10
+    max_epochs: &max_epochs 100
+    warmup_start_lr: 0.0
+    eta_min: 1.e-6
+trainer:
+  _target_: lightning.pytorch.Trainer
+  accelerator: gpu
+  # accumulate_grad_batches: 5
+  callbacks:
+    - _target_: lightning.pytorch.callbacks.LearningRateMonitor
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: val_acc
+      verbose: True
+      save_last: True
+      mode: max
+    # - _target_: aij_2023_equal_ai.callbacks.EpochStopping
+    #   epoch_threshold: 140
+  # deterministic: warn
+  devices: 2
+  max_epochs: *max_epochs
+  # profiler: simple
+  # fast_dev_run: True
+  # use_distributed_sampler: False
+  # precision: 16-mixed
+  # strategy: ddp_find_unused_parameters_true
+  # sync_batchnorm: True
+# ckpt_path: null
+ckpt_path: *ckpt

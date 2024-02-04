@@ -1,0 +1,8 @@
+.venv
+/configs
+/input
+/notebooks
+/scripts
+/src
+/tests
+/working

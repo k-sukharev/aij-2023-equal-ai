@@ -1,0 +1,152 @@
+seed_everything:
+  _target_: lightning.seed_everything
+  seed: &seed 42
+  workers: True
+datamodule:
+  _target_: aij_2023_equal_ai.datasets.KineticsDataModule
+  data_path: ../input/slovo_event_offset_48_anno
+  video_path_prefix: ../input/slovo_event_offset_48
+  train_transforms:
+    _target_: aij_2023_equal_ai.transforms.create_video_transform
+    mode: train
+    video_key: video
+    remove_key: null
+    num_samples: 32
+    convert_to_float: False
+    video_mean: [123.675, 116.28, 103.53]
+    video_std: [58.395, 57.12, 57.375]
+    min_size: 224
+    max_size: 256
+    crop_size: 224
+    horizontal_flip_prob: 0.5
+    aug_type: randaug  # default randaug augmix
+    aug_paras: null
+  val_transforms:
+    _target_: aij_2023_equal_ai.transforms.create_video_transform
+    mode: val
+    video_key: video
+    remove_key: null
+    num_samples: 16
+    convert_to_float: False
+    video_mean: [123.675, 116.28, 103.53]
+    video_std: [58.395, 57.12, 57.375]
+    min_size: 224
+    max_size: 256
+    crop_size: 224
+    horizontal_flip_prob: 0.5
+    aug_type: default
+    aug_paras: null
+  clip_duration: 2.14  # 2.67~80 frames at 30 fps (30 * 2.67), 2.14~64 frames at 30 fps (30 * 2.14)
+  seed: *seed
+  batch_size: 7
+  num_workers: 8
+  pin_memory: False
+model:
+  _target_: aij_2023_equal_ai.models.DistillationLightningModule
+  _recursive_: False
+  _convert_: partial
+  student:
+    _target_: pytorchvideo.models.x3d.create_x3d
+    # Input clip configs.
+    input_channel: 3
+    input_clip_length: 16
+    input_crop_size: 224
+    # Model configs.
+    model_num_class: &num_classes 1001
+    dropout_rate: 0.5
+    width_factor: 2.0
+    depth_factor: 2.2
+    # Normalization configs.
+    norm:
+      _target_: torch.nn.BatchNorm3d
+      _partial_: True
+    norm_eps: 1.e-5
+    norm_momentum: 0.1
+    # Activation configs.
+    activation:
+      _target_: torch.nn.ReLU
+      _partial_: True
+    # Stem configs.
+    stem_dim_in: 12
+    stem_conv_kernel_size: [5, 3, 3]
+    stem_conv_stride: [1, 2, 2]
+    # Stage configs.
+    stage_conv_kernel_size: [
+        [3, 3, 3],
+        [3, 3, 3],
+        [3, 3, 3],
+        [3, 3, 3]
+    ]
+    stage_spatial_stride: [2, 2, 2, 2]
+    stage_temporal_stride: [1, 1, 1, 1]
+    bottleneck:
+      _target_: pytorchvideo.models.x3d.create_x3d_bottleneck_block
+      _partial_: True
+    bottleneck_factor: 2.25
+    se_ratio: 0.0625
+    inner_act:
+      _target_: pytorchvideo.layers.swish.Swish
+      _partial_: True
+    # Head configs.
+    head_dim_out: 2048
+    head_pool_act:
+      _target_: torch.nn.ReLU
+      _partial_: True
+    head_bn_lin5_on: False
+    head_activation: null
+    head_output_with_global_average: True
+  student_chekpoint: ../input/x3d.pth
+  num_classes: *num_classes
+  student_loss:
+    _target_: torch.nn.CrossEntropyLoss
+    reduction: mean
+    label_smoothing: 0.0
+  teacher:
+    _target_: mmaction.apis.init_recognizer
+    config: ../input/baseline/mvit32.2_small_config.py
+    checkpoint: ../input/baseline/mvit32.2_small.pth
+    device: cpu
+  temperature: 1
+  distillation_loss:
+    _target_: torch.nn.KLDivLoss
+    reduction: batchmean
+  distillation_loss_weight: 0.9 # total_loss = d_loss_weight * d_loss + (1 - d_loss_weight) * st_loss
+  batch_key: video
+  optimizer:
+    _target_: torch.optim.AdamW
+    _convert_: partial
+    lr: 3.e-4
+    weight_decay: 1.e-2
+  scheduler_dict:
+    interval: step
+  scheduler:
+    _target_: pl_bolts.optimizers.lr_scheduler.LinearWarmupCosineAnnealingLR
+    warmup_epochs: 10
+    max_epochs: &max_epochs 200
+    warmup_start_lr: 0.0
+    eta_min: 0.0
+trainer:
+  _target_: lightning.pytorch.Trainer
+  accelerator: gpu
+  # accumulate_grad_batches: 5
+  callbacks:
+    - _target_: lightning.pytorch.callbacks.LearningRateMonitor
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: val_acc
+      verbose: True
+      save_last: True
+      mode: max
+    # - _target_: aij_2023_equal_ai.callbacks.EpochStopping
+    #   epoch_threshold: 200
+  # deterministic: warn
+  devices: 2
+  max_epochs: *max_epochs
+  # strategy: fsdp
+  # profiler: simple
+  # fast_dev_run: True
+  # use_distributed_sampler: False
+  # precision: 16-mixed
+  strategy: ddp_find_unused_parameters_true
+  # sync_batchnorm: True
+# ckpt_path: null
+ckpt_path: lightning_logs/version_32/checkpoints/last.ckpt  # 30, 31, 32
