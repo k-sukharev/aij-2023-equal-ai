@@ -94,31 +94,9 @@ class VideoClassificationLightningModule(pl.LightningModule):
             self.trainer.datamodule.train_dataset.dataset.video_sampler.set_epoch(epoch)
 
     def forward(self, x):
-        """
-        Forward defines the prediction/inference actions.
-        """
         return self.net(x)
 
     def training_step(self, batch, batch_idx):
-        """
-        This function is called in the inner loop of the training epoch. It must
-        return a loss that is used for loss.backwards() internally. The self.log(...)
-        function can be used to log any training metrics.
-
-        PyTorchVideo batches are dictionaries containing each modality or metadata of
-        the batch collated video clips. Dataset contains the following notable keys:
-           {
-               'video': <video_tensor>,
-               'label': <action_label>,
-           }
-
-        - "video" is a Tensor of shape (batch, channels, time, height, Width)
-        - "label" is a Tensor of shape (batch, 1)
-
-        The PyTorchVideo models and transforms expect the same input shapes and
-        dictionary structure making this function just a matter of unwrapping the dict and
-        feeding it through the model/loss.
-        """
         x = batch[self.hparams.batch_key]
         batch_size = x.shape[0]
         y_hat = self.net(x)
@@ -137,11 +115,6 @@ class VideoClassificationLightningModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        """
-        This function is called in the inner loop of the evaluation cycle. For this
-        simple example it's mostly the same as the training loop but with a different
-        metric name.
-        """
         x = batch[self.hparams.batch_key]
         batch_size = x.shape[0]
         y_hat = self.net(x)
@@ -186,6 +159,7 @@ class VideoClassificationLightningModule(pl.LightningModule):
                 optimizer=optimizer
             )
         return [optimizer], [self.hparams.scheduler_dict]
+
 
 class DistillationLightningModule(pl.LightningModule):
     def __init__(
@@ -235,31 +209,9 @@ class DistillationLightningModule(pl.LightningModule):
             self.trainer.datamodule.train_dataset.dataset.video_sampler.set_epoch(epoch)
 
     def forward(self, x):
-        """
-        Forward defines the prediction/inference actions.
-        """
         return self.student(x)
 
     def training_step(self, batch, batch_idx):
-        """
-        This function is called in the inner loop of the training epoch. It must
-        return a loss that is used for loss.backwards() internally. The self.log(...)
-        function can be used to log any training metrics.
-
-        PyTorchVideo batches are dictionaries containing each modality or metadata of
-        the batch collated video clips. Dataset contains the following notable keys:
-           {
-               'video': <video_tensor>,
-               'label': <action_label>,
-           }
-
-        - "video" is a Tensor of shape (batch, channels, time, height, Width)
-        - "label" is a Tensor of shape (batch, 1)
-
-        The PyTorchVideo models and transforms expect the same input shapes and
-        dictionary structure making this function just a matter of unwrapping the dict and
-        feeding it through the model/loss.
-        """
         x = batch[self.hparams.batch_key]
         batch_size = x.shape[0]
 
@@ -288,11 +240,6 @@ class DistillationLightningModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        """
-        This function is called in the inner loop of the evaluation cycle. For this
-        simple example it's mostly the same as the training loop but with a different
-        metric name.
-        """
         x = batch[self.hparams.batch_key]
         batch_size = x.shape[0]
         student_logits = self.student(x)

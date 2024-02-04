@@ -6,8 +6,6 @@ COPY requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 # RUN DS_BUILD_FUSED_ADAM=1 pip install deepspeed==0.11.1
 
-# RUN pip install notebook==6.4.8
-
 ARG DEBIAN_FRONTEND=noninteractive
 
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
@@ -35,16 +33,4 @@ RUN git checkout 4d6c93474730cad2f25e51109adcf96824efc7a3
 RUN pip install cython --no-cache-dir
 RUN pip install --no-cache-dir -e .
 
-# RUN git clone -b main https://github.com/open-mmlab/mmrazor.git /mmrazor
-# WORKDIR /mmrazor
-
-# RUN sed -i 's/--local_rank/--local-rank/g' /mmrazor/tools/train.py
-
-# RUN pip install --no-cache-dir -v -e .
-
-# RUN pip install --no-cache-dir pytorchvideo
-
 WORKDIR /home/jovyan/
-
-# RUN sed -i 's/num_classes=400,/num_classes=1001,/g' /mmaction2/configs/_base_/models/mvit_small.py
-# RUN sed -i 's/num_classes=400,/num_classes=1001,/g' /mmaction2/configs/_base_/models/x3d.py

@@ -61,12 +61,6 @@ class LimitDataset(Dataset):
 
 
 class KineticsDataModule(pl.LightningDataModule):
-    """
-    This LightningDataModule implementation constructs a PyTorchVideo Kinetics dataset for both
-    the train and val partitions. It defines each partition's augmentation and
-    preprocessing transforms and configures the PyTorch DataLoaders.
-    """
-
     def __init__(
             self,
             data_path: str,
